@@ -3,6 +3,13 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- SCHEDULE_EXACT_ALARM: agar notifikasi pengingat harian muncul tepat
+         waktu dan tidak ditunda OS. Wajib untuk exactAllowWhileIdle mode.
+         Android 12+ mungkin minta user grant via Settings > Apps > Alarms. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <!-- RECEIVE_BOOT_COMPLETED: agar notifikasi dijadwal ulang otomatis
+         setelah HP restart — tanpa ini jadwal hilang saat HP dimatikan. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     
     <application
         android:label="amimir"

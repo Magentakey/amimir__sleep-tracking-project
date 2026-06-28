@@ -4,20 +4,20 @@ import 'package:timezone/timezone.dart' as tz;
 
 /// Mengelola semua notifikasi OS (status bar) untuk Amimir.
 ///
-/// Tiga jenis notifikasi yang dikelola:
-/// 1. **Sleep Active** — ongoing saat timer tidur berjalan (tidak bisa
-///    di-swipe, hilang lewat [cancelSleepNotification]).
-/// 2. **Daily Log Reminder** — notifikasi terjadwal harian yang mengingatkan
-///    user untuk mengisi data harian (mood, aktivitas, kafein, makanan).
+/// Dua jenis notifikasi:
+/// 1. **Sleep Active** — ongoing saat timer tidur berjalan.
+/// 2. **Daily Log Reminder** — notifikasi terjadwal harian menggunakan
+///    [AndroidScheduleMode.exactAllowWhileIdle] supaya muncul tepat waktu
+///    meski device sedang idle/Doze mode.
 ///
-/// Notifikasi achievement TIDAK melewati kelas ini — ditangani in-app
-/// oleh [AchievementUnlockBanner].
+/// Kenapa exactAllowWhileIdle, bukan inexactAllowWhileIdle:
+/// Mode inexact bisa ditunda OS berjam-jam saat battery optimization aktif
+/// (terutama Samsung). Mode exact dijamin muncul tepat waktu — ini yang
+/// dipakai aplikasi alarm dan kalender.
 class NotificationService {
   NotificationService._();
 
   static final NotificationService _instance = NotificationService._();
-
-  /// Singleton — selalu pakai instance yang sama.
   factory NotificationService() => _instance;
 
   // ── ID & Channel ──────────────────────────────────────────────────────────
@@ -42,10 +42,12 @@ class NotificationService {
 
   bool _initialized = false;
 
+  AndroidFlutterLocalNotificationsPlugin? get _androidPlugin =>
+      _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+
   // ─── Inisialisasi ─────────────────────────────────────────────────────────
 
-  /// Inisialisasi plugin. Dipanggil sekali di [main()].
-  /// Aman dipanggil berkali-kali — idempotent.
   Future<void> initialize() async {
     if (_initialized) return;
 
@@ -57,29 +59,35 @@ class NotificationService {
     );
 
     await _plugin.initialize(settings);
-
     _initialized = true;
   }
 
-  /// Minta izin notifikasi ke user.
-  ///
-  /// Android 13+ (API 33+): memunculkan dialog izin sistem sekali saja.
-  /// Android di bawah 13: no-op, izin otomatis diberikan.
+  /// Minta izin notifikasi (POST_NOTIFICATIONS) ke user.
+  /// Android 13+ (API 33+): muncul dialog sistem sekali saja.
   Future<void> requestPermissions() async {
-    final AndroidFlutterLocalNotificationsPlugin? androidPlugin = _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+    await _androidPlugin?.requestNotificationsPermission();
+  }
 
-    await androidPlugin?.requestNotificationsPermission();
+  /// Minta izin exact alarm ke user (SCHEDULE_EXACT_ALARM).
+  ///
+  /// Android 12+ (API 31+): sistem mungkin meminta user mengizinkan
+  /// exact alarm via Settings → Apps → Amimir → Alarms & Reminders.
+  /// Method ini membuka halaman settings tersebut langsung.
+  ///
+  /// Dipanggil di profile_screen saat user menyalakan reminder,
+  /// bukan di startup — agar tidak membingungkan user yang belum butuh.
+  Future<void> requestExactAlarmPermission() async {
+    await _androidPlugin?.requestExactAlarmsPermission();
+  }
+
+  /// Cek apakah izin exact alarm sudah diberikan.
+  Future<bool> canScheduleExactAlarms() async {
+    final bool? result = await _androidPlugin?.canScheduleExactNotifications();
+    return result ?? false;
   }
 
   // ─── Sleep Active ─────────────────────────────────────────────────────────
 
-  /// Tampilkan notifikasi "Tidur sedang aktif" di status bar.
-  ///
-  /// Bersifat `ongoing` (tidak bisa di-swipe) — hilang hanya lewat
-  /// [cancelSleepNotification()].
   Future<void> showSleepActiveNotification({
     required DateTime startTime,
   }) async {
@@ -111,8 +119,6 @@ class NotificationService {
     );
   }
 
-  /// Batalkan notifikasi sleep aktif.
-  /// Dipanggil saat user menghentikan timer (Stop Sleep).
   Future<void> cancelSleepNotification() async {
     await _plugin.cancel(_sleepNotificationId);
   }
@@ -121,13 +127,10 @@ class NotificationService {
 
   /// Jadwalkan pengingat harian pada [time] yang ditentukan user.
   ///
-  /// Notifikasi akan muncul setiap hari pada jam yang sama.
-  /// Menggunakan [AndroidScheduleMode.inexactAllowWhileIdle] — tidak
-  /// membutuhkan izin SCHEDULE_EXACT_ALARM (lebih hemat baterai).
-  ///
-  /// Panggil [cancelDailyLogReminder()] sebelum memanggil ini lagi
-  /// kalau user mengubah waktu pengingat, supaya jadwal lama tidak
-  /// tumpang-tindih.
+  /// Memakai [AndroidScheduleMode.exactAllowWhileIdle] — notifikasi dijamin
+  /// muncul tepat waktu meski device sedang idle/Doze mode/battery saver.
+  /// Butuh permission SCHEDULE_EXACT_ALARM di AndroidManifest, dan pada
+  /// Android 12+ user perlu grant via Settings jika belum diizinkan.
   Future<void> scheduleDailyLogReminder({required TimeOfDay time}) async {
     if (!_initialized) await initialize();
 
@@ -168,16 +171,15 @@ class NotificationService {
       'Jangan lupa isi mood, aktivitas, kafein, dan data makanan hari ini.',
       scheduledDate,
       const NotificationDetails(android: androidDetails),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      // matchDateTimeComponents.time → ulang setiap hari di jam yang sama
+      // exactAllowWhileIdle: notif dijamin tepat waktu, tidak bisa
+      // ditunda OS meski device idle/Doze/battery saver (Samsung friendly).
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
-      // Diperlukan oleh flutter_local_notifications meski tidak relevan di Android
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
 
-  /// Batalkan pengingat harian.
   Future<void> cancelDailyLogReminder() async {
     await _plugin.cancel(_dailyReminderNotificationId);
   }

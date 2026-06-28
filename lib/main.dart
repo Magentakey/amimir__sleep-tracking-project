@@ -1,8 +1,10 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 import 'app.dart';
 import 'core/services/notification_service.dart';
@@ -25,15 +27,27 @@ Future<void> main() async {
   await Hive.openBox(LocalSettingsService.settingsBoxName);
 
   // ── Timezone ──────────────────────────────────────────────────────────────
-  // Wajib untuk fitur Daily Log Reminder (zonedSchedule di NotificationService)
+  // Langkah 1: muat seluruh database timezone dunia
   tz.initializeTimeZones();
+
+  // Langkah 2: baca timezone aktif dari device (misal "Asia/Jakarta")
+  // dan set sebagai tz.local supaya scheduleDailyLogReminder memakai
+  // jam lokal device — bukan UTC.
+  // Tanpa ini, notifikasi jam 21:00 WIB dijadwalkan jam 21:00 UTC = 04:00 WIB.
+  try {
+    final String deviceTimezone = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(deviceTimezone));
+  } catch (_) {
+    // Fallback ke WIB kalau gagal baca timezone device
+    tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
+  }
 
   // ── Notifikasi OS ─────────────────────────────────────────────────────────
   await NotificationService().initialize();
   await NotificationService().requestPermissions();
 
   // Jadwal ulang pengingat harian kalau sebelumnya aktif.
-  // Ini menangani kasus app di-reinstall (semua jadwal notif terhapus oleh OS).
+  // Menangani kasus app di-reinstall (semua jadwal notif terhapus oleh OS).
   final LocalSettingsService settings = LocalSettingsService();
   if (settings.getReminderEnabled()) {
     await NotificationService().scheduleDailyLogReminder(

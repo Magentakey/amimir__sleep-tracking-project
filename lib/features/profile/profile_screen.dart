@@ -480,7 +480,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     await _settingsService.setReminderEnabled(value);
 
     if (value) {
-      await NotificationService().scheduleDailyLogReminder(time: _reminderTime);
+      // Android 12+ butuh izin SCHEDULE_EXACT_ALARM untuk notifikasi
+      // tepat waktu. Minta izin dulu, baru jadwalkan.
+      final bool canExact =
+          await NotificationService().canScheduleExactAlarms();
+      if (!canExact) {
+        await NotificationService().requestExactAlarmPermission();
+        // Setelah kembali dari settings, coba jadwalkan.
+        // Kalau user tidak izinkan, notifikasi tetap terjadwal tapi
+        // mungkin ditunda OS (fallback ke inexact behaviour).
+      }
+      await NotificationService().scheduleDailyLogReminder(
+        time: _reminderTime,
+      );
     } else {
       await NotificationService().cancelDailyLogReminder();
     }
