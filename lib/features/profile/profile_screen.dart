@@ -52,21 +52,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _reminderEnabled = false;
   TimeOfDay _reminderTime = const TimeOfDay(hour: 21, minute: 0);
 
+  // Stream profile dari Firestore — disimpan sebagai field supaya tidak
+  // dibuat ulang setiap kali setState() dipanggil. Berbeda dengan
+  // FutureBuilder yang reset ke loading saat build() jalan ulang,
+  // StreamBuilder mempertahankan data terakhir saat rebuild.
+  late final Stream<DocumentSnapshot<Map<String, dynamic>>> _profileStream;
+
   @override
   void initState() {
     super.initState();
-    _loadBackupInfo();
-    _loadReminderSettings();
-  }
 
-  Future<DocumentSnapshot<Map<String, dynamic>>?> _getUserProfile() async {
     final User? user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      return null;
+    if (user != null) {
+      _profileStream = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots();
+    } else {
+      // Tidak seharusnya terjadi (route guard sudah redirect ke /login),
+      // tapi beri empty stream sebagai fallback supaya tidak crash.
+      _profileStream =
+          const Stream<DocumentSnapshot<Map<String, dynamic>>>.empty();
     }
 
-    return FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    _loadBackupInfo();
+    _loadReminderSettings();
   }
 
   Future<void> _handleLogout() async {
@@ -375,7 +385,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Nama berhasil diperbarui.')),
       );
-      setState(() {}); // trigger rebuild supaya FutureBuilder fetch ulang
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -447,7 +456,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           content: Text('Target tidur diperbarui menjadi $selected jam.'),
         ),
       );
-      setState(() {});
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -662,10 +670,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     return AppScaffold(
       currentIndex: 4,
-      body: FutureBuilder<DocumentSnapshot<Map<String, dynamic>>?>(
-        future: _getUserProfile(),
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _profileStream,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          // Hanya tampilkan loading saat belum ada data sama sekali.
+          // Setelah data pertama masuk, rebuild berikutnya (dari setState
+          // lokal seperti _isUploadingPhoto) tidak akan kembali ke loading.
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
             return _buildLoadingState();
           }
 
