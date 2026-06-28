@@ -1,11 +1,8 @@
-import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/services/notification_service.dart';
@@ -35,17 +32,12 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final AuthRepository _authRepository = AuthRepository();
   final ProfileRepository _profileRepository = ProfileRepository();
-  final ImagePicker _imagePicker = ImagePicker();
 
   bool _isLoggingOut = false;
   bool _isBackingUp = false;
   bool _isRestoring = false;
   bool _isLoadingBackupInfo = true;
-  bool _isUploadingPhoto = false;
   BackupSummary? _lastBackupInfo;
-
-  // Foto profil lokal (sebelum upload selesai, tampilkan preview dari file)
-  File? _localPhotoPreview;
 
   // ── Daily reminder ────────────────────────────────────────────────────────
   final LocalSettingsService _settingsService = LocalSettingsService();
@@ -323,7 +315,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _goToDiseaseHistory() {
-    context.go(AppRoutePath.diseaseHistory);
+    // Pakai push (bukan go) supaya halaman ini masuk ke stack navigasi
+    // dan DiseaseHistoryScreen bisa kembali ke sini lewat context.pop().
+    context.push(AppRoutePath.diseaseHistory);
   }
 
   // ─── Edit Display Name ────────────────────────────────────────────────────
@@ -461,42 +455,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal memperbarui target tidur: $e')),
       );
-    }
-  }
-
-  // ─── Upload Profile Photo ─────────────────────────────────────────────────
-
-  Future<void> _handlePickAndUploadPhoto() async {
-    final XFile? picked = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 75,
-      maxWidth: 512,
-      maxHeight: 512,
-    );
-
-    if (picked == null || !mounted) return;
-
-    final File imageFile = File(picked.path);
-
-    setState(() {
-      _localPhotoPreview = imageFile;
-      _isUploadingPhoto = true;
-    });
-
-    try {
-      await _profileRepository.updateProfilePhoto(imageFile);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Foto profil berhasil diperbarui.')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _localPhotoPreview = null);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal upload foto: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _isUploadingPhoto = false);
     }
   }
 
@@ -674,8 +632,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         stream: _profileStream,
         builder: (context, snapshot) {
           // Hanya tampilkan loading saat belum ada data sama sekali.
-          // Setelah data pertama masuk, rebuild berikutnya (dari setState
-          // lokal seperti _isUploadingPhoto) tidak akan kembali ke loading.
+          // Setelah data pertama masuk, rebuild dari setState lokal
+          // tidak akan kembali ke loading.
           if (snapshot.connectionState == ConnectionState.waiting &&
               !snapshot.hasData) {
             return _buildLoadingState();
@@ -690,9 +648,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               (data?['profile']?['sleep_goal'] as num?)?.toInt() ?? 8;
           final String accountStatus = _getAccountStatus(user);
           final String joinInfo = _getJoinInfo(user);
-          final String? photoUrl =
-              data?['profile']?['photo_url'] as String? ??
-              user?.photoURL;
 
           final List<AchievementProgress> achievements =
               achievementState.value ?? [];
@@ -713,7 +668,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   email: email,
                   accountStatus: accountStatus,
                   equippedAchievement: equippedAchievement,
-                  photoUrl: photoUrl,
                 ),
                 const SizedBox(height: 18),
                 _buildAchievementPreviewSection(
@@ -795,7 +749,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required String email,
     required String accountStatus,
     required AchievementProgress? equippedAchievement,
-    String? photoUrl,
   }) {
     return AppCard(
       color: AppColors.surfaceVariant.withValues(alpha: 0.58),
@@ -804,56 +757,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       isGlass: true,
       child: Column(
         children: [
-          // ── Avatar ──────────────────────────────────────────────────────
-          Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              GestureDetector(
-                onTap: _handlePickAndUploadPhoto,
-                child: Container(
-                  width: 104,
-                  height: 104,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: AppColors.sleepGradient,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.softGlow,
-                        blurRadius: 42,
-                        offset: Offset(0, 18),
-                      ),
-                    ],
-                  ),
-                  child: ClipOval(
-                    child: _isUploadingPhoto
-                        ? const Center(
-                            child: CircularProgressIndicator(
-                              color: AppColors.onPrimary,
-                              strokeWidth: 2.5,
-                            ),
-                          )
-                        : _buildAvatarContent(displayName, photoUrl),
-                  ),
+          // ── Avatar (initial saja, foto profil tidak tersedia) ─────────────
+          Container(
+            width: 104,
+            height: 104,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: AppColors.sleepGradient,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.softGlow,
+                  blurRadius: 42,
+                  offset: Offset(0, 18),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                _getInitial(displayName),
+                style: AppTextStyles.displayMedium.copyWith(
+                  color: AppColors.onPrimary,
                 ),
               ),
-              // Tombol edit kecil di pojok kanan bawah avatar
-              GestureDetector(
-                onTap: _handlePickAndUploadPhoto,
-                child: Container(
-                  width: 30,
-                  height: 30,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.primary,
-                  ),
-                  child: const Icon(
-                    Icons.camera_alt_rounded,
-                    size: 16,
-                    color: AppColors.onPrimary,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
           const SizedBox(height: 20),
 
@@ -891,35 +817,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ],
           _buildStatusPill(accountStatus),
         ],
-      ),
-    );
-  }
-
-  /// Konten avatar: foto dari Storage/local preview, atau initial name.
-  Widget _buildAvatarContent(String displayName, String? photoUrl) {
-    // Preview lokal (baru dipilih, belum selesai upload)
-    if (_localPhotoPreview != null) {
-      return Image.file(_localPhotoPreview!, fit: BoxFit.cover);
-    }
-    // Foto dari Firebase Storage
-    if (photoUrl != null && photoUrl.isNotEmpty) {
-      return Image.network(
-        photoUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildInitialAvatar(displayName),
-      );
-    }
-    // Fallback: initial huruf pertama
-    return _buildInitialAvatar(displayName);
-  }
-
-  Widget _buildInitialAvatar(String displayName) {
-    return Center(
-      child: Text(
-        _getInitial(displayName),
-        style: AppTextStyles.displayMedium.copyWith(
-          color: AppColors.onPrimary,
-        ),
       ),
     );
   }

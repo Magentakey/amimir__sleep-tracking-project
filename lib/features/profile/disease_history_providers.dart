@@ -2,17 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/disease_history.dart';
 import '../../data/repositories/disease_history_repository.dart';
-import '../../data/repositories/profile_repository.dart';
 
-// ─── Repository providers ─────────────────────────────────────────────────────
+// ─── Repository provider ──────────────────────────────────────────────────────
 
 final diseaseHistoryRepositoryProvider =
     Provider<DiseaseHistoryRepository>((ref) {
   return DiseaseHistoryRepository();
-});
-
-final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
-  return ProfileRepository();
 });
 
 // ─── Stream provider ─────────────────────────────────────────────────────────
@@ -24,10 +19,7 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
 /// - User mungkin add/edit/delete di DiseaseHistoryScreen lalu langsung
 ///   buka AnalysisScreen — perlu data selalu up-to-date tanpa manual
 ///   invalidation
-/// - Tidak ada biaya Firestore tambahan yang signifikan karena data ini
-///   kecil dan jarang berubah
-///
-/// Listener otomatis tutup saat provider di-dispose (keluar dari screen).
+/// - Listener otomatis tutup saat provider di-dispose (keluar dari screen)
 final diseaseHistoryProvider =
     StreamProvider.autoDispose<List<DiseaseHistory>>((ref) {
   final DiseaseHistoryRepository repo = ref.watch(
