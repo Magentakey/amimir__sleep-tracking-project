@@ -328,7 +328,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     final String? newName = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
+      // Gunakan dialogContext (bukan outer context) untuk Navigator.pop.
+      // Outer context bisa berubah saat StreamBuilder rebuild (Firestore
+      // emit data baru setelah save), yang menyebabkan assertion error
+      // _dependents.isEmpty jika dialog masih terbuka saat itu.
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surfaceContainerHigh,
         title: Text('Ubah Nama', style: AppTextStyles.cardTitle),
         content: TextField(
@@ -358,18 +362,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(null),
+            onPressed: () => Navigator.of(dialogContext).pop(null),
             child: const Text('Batal'),
           ),
           TextButton(
-            onPressed: () => Navigator.of(context).pop(ctrl.text.trim()),
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(ctrl.text.trim()),
             child: const Text('Simpan'),
           ),
         ],
       ),
     );
 
-    ctrl.dispose();
+    // Tunda dispose sampai frame berikutnya supaya Flutter selesai
+    // menghapus widget dialog dari tree sebelum controller dibuang.
+    // Memanggil ctrl.dispose() langsung menyebabkan assertion error
+    // _dependents.isEmpty karena TextField masih punya dependents aktif.
+    WidgetsBinding.instance.addPostFrameCallback((_) => ctrl.dispose());
 
     if (newName == null || newName.isEmpty || !mounted) return;
 
