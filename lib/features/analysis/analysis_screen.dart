@@ -9,10 +9,13 @@ import '../../data/local/local_daily_log_service.dart';
 import '../../data/local/local_sleep_service.dart';
 import '../../data/models/analysis_cache.dart';
 import '../../data/models/daily_log.dart';
+import '../../data/models/disease_history.dart';
 import '../../data/models/sleep_log.dart';
 import '../../data/remote/ai_analysis_service.dart';
 import '../../data/repositories/analysis_repository.dart';
+import '../../data/repositories/disease_history_repository.dart';
 import '../daily_log/daily_log_providers.dart';
+import '../profile/disease_history_providers.dart';
 import '../sleep/sleep_providers.dart';
 import 'analysis_providers.dart';
 
@@ -30,6 +33,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
   late final LocalDailyLogService _dailyLogService;
   late final AnalysisRepository _analysisRepository;
   late final AiAnalysisService _aiAnalysisService;
+  late final DiseaseHistoryRepository _diseaseHistoryRepository;
 
   AnalysisPeriod _selectedPeriod = AnalysisPeriod.daily;
 
@@ -55,6 +59,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
     _dailyLogService = ref.read(dailyLogRepositoryProvider);
     _analysisRepository = ref.read(analysisRepositoryProvider);
     _aiAnalysisService = ref.read(aiAnalysisServiceProvider);
+    _diseaseHistoryRepository = ref.read(diseaseHistoryRepositoryProvider);
 
     final DateTime defaultDate = _getDefaultAnalysisDate();
 
@@ -189,6 +194,12 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
     bool usingFallback = false;
 
     try {
+      // Ambil riwayat penyakit dari Firestore untuk konteks AI.
+      // Satu fetch per klik Generate — tidak disimpan ke state supaya
+      // selalu up-to-date tanpa perlu invalidasi manual.
+      final List<DiseaseHistory> diseaseHistory =
+          await _diseaseHistoryRepository.getAll();
+
       final AiAnalysisResult aiResult = await _aiAnalysisService
           .generateSleepAnalysis(
             periodType: data.periodType,
@@ -197,6 +208,7 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
             sleepLogs: data.sleepLogs,
             dailyLogs: data.dailyLogs,
             missingSleepDates: data.missingSleepDates,
+            diseaseHistory: diseaseHistory,
           );
 
       generatedSummary = aiResult.summary;

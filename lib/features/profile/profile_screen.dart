@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/services/notification_service.dart';
@@ -14,11 +17,13 @@ import '../../data/local/local_settings_service.dart';
 import '../../data/models/achievement.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/backup_repository.dart';
+import '../../data/repositories/profile_repository.dart';
 import '../../routes/app_router.dart';
 import '../achievements/achievement_providers.dart';
 import '../daily_log/daily_log_providers.dart';
 import '../sleep/sleep_providers.dart';
 import 'backup_providers.dart';
+import 'disease_history_providers.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -29,14 +34,20 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final AuthRepository _authRepository = AuthRepository();
+  final ProfileRepository _profileRepository = ProfileRepository();
+  final ImagePicker _imagePicker = ImagePicker();
 
   bool _isLoggingOut = false;
   bool _isBackingUp = false;
   bool _isRestoring = false;
   bool _isLoadingBackupInfo = true;
+  bool _isUploadingPhoto = false;
   BackupSummary? _lastBackupInfo;
 
-  // ── Daily reminder ─────────────────────────────────────────────────────────
+  // Foto profil lokal (sebelum upload selesai, tampilkan preview dari file)
+  File? _localPhotoPreview;
+
+  // ── Daily reminder ────────────────────────────────────────────────────────
   final LocalSettingsService _settingsService = LocalSettingsService();
   bool _reminderEnabled = false;
   TimeOfDay _reminderTime = const TimeOfDay(hour: 21, minute: 0);
@@ -301,6 +312,186 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     context.go(AppRoutePath.achievements);
   }
 
+  void _goToDiseaseHistory() {
+    context.go(AppRoutePath.diseaseHistory);
+  }
+
+  // ─── Edit Display Name ────────────────────────────────────────────────────
+
+  Future<void> _handleEditDisplayName(String currentName) async {
+    final TextEditingController ctrl =
+        TextEditingController(text: currentName);
+
+    final String? newName = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surfaceContainerHigh,
+        title: Text('Ubah Nama', style: AppTextStyles.cardTitle),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: AppTextStyles.body.copyWith(color: AppColors.onSurface),
+          decoration: InputDecoration(
+            hintText: 'Nama tampilan',
+            hintStyle: AppTextStyles.body.copyWith(
+              color: AppColors.onSurfaceMuted,
+            ),
+            filled: true,
+            fillColor: AppColors.surfaceContainerHighest,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: AppColors.outlineVariant),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: AppColors.outlineVariant),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: AppColors.primary),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(ctrl.text.trim()),
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+
+    ctrl.dispose();
+
+    if (newName == null || newName.isEmpty || !mounted) return;
+
+    try {
+      await _profileRepository.updateDisplayName(newName);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nama berhasil diperbarui.')),
+      );
+      setState(() {}); // trigger rebuild supaya FutureBuilder fetch ulang
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memperbarui nama: $e')),
+      );
+    }
+  }
+
+  // ─── Edit Sleep Goal ──────────────────────────────────────────────────────
+
+  Future<void> _handleEditSleepGoal(int currentGoal) async {
+    int selected = currentGoal;
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          backgroundColor: AppColors.surfaceContainerHigh,
+          title: Text('Target Tidur', style: AppTextStyles.cardTitle),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$selected jam',
+                style: AppTextStyles.displayMedium.copyWith(
+                  color: AppColors.primary,
+                ),
+              ),
+              Slider(
+                value: selected.toDouble(),
+                min: 4,
+                max: 12,
+                divisions: 8,
+                activeColor: AppColors.primary,
+                inactiveColor: AppColors.outlineVariant,
+                label: '$selected jam',
+                onChanged: (v) => setInner(() => selected = v.round()),
+              ),
+              Text(
+                'Rekomendasi WHO: 7–9 jam untuk dewasa.',
+                style: AppTextStyles.small.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Batal'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _profileRepository.updateSleepGoal(selected);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Target tidur diperbarui menjadi $selected jam.'),
+        ),
+      );
+      setState(() {});
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memperbarui target tidur: $e')),
+      );
+    }
+  }
+
+  // ─── Upload Profile Photo ─────────────────────────────────────────────────
+
+  Future<void> _handlePickAndUploadPhoto() async {
+    final XFile? picked = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 75,
+      maxWidth: 512,
+      maxHeight: 512,
+    );
+
+    if (picked == null || !mounted) return;
+
+    final File imageFile = File(picked.path);
+
+    setState(() {
+      _localPhotoPreview = imageFile;
+      _isUploadingPhoto = true;
+    });
+
+    try {
+      await _profileRepository.updateProfilePhoto(imageFile);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Foto profil berhasil diperbarui.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _localPhotoPreview = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal upload foto: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
   // ─── Daily Reminder ────────────────────────────────────────────────────────
 
   void _loadReminderSettings() {
@@ -483,8 +674,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           final String displayName = _getDisplayName(user: user, data: data);
           final String email = _getEmail(user: user, data: data);
           final String sleepGoal = _getSleepGoal(data);
+          final int sleepGoalInt =
+              (data?['profile']?['sleep_goal'] as num?)?.toInt() ?? 8;
           final String accountStatus = _getAccountStatus(user);
           final String joinInfo = _getJoinInfo(user);
+          final String? photoUrl =
+              data?['profile']?['photo_url'] as String? ??
+              user?.photoURL;
 
           final List<AchievementProgress> achievements =
               achievementState.value ?? [];
@@ -505,6 +701,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   email: email,
                   accountStatus: accountStatus,
                   equippedAchievement: equippedAchievement,
+                  photoUrl: photoUrl,
                 ),
                 const SizedBox(height: 18),
                 _buildAchievementPreviewSection(
@@ -517,9 +714,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildAccountSection(
                   email: email,
                   sleepGoal: sleepGoal,
+                  sleepGoalInt: sleepGoalInt,
                   accountStatus: accountStatus,
                   joinInfo: joinInfo,
                 ),
+                const SizedBox(height: 18),
+                _buildDiseaseHistorySection(),
                 const SizedBox(height: 18),
                 _buildAppSection(),
                 const SizedBox(height: 18),
@@ -583,42 +783,87 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required String email,
     required String accountStatus,
     required AchievementProgress? equippedAchievement,
+    String? photoUrl,
   }) {
     return AppCard(
-      color: AppColors.surfaceVariant.withOpacity(0.58),
+      color: AppColors.surfaceVariant.withValues(alpha: 0.58),
       padding: const EdgeInsets.all(24),
       radius: 38,
       isGlass: true,
       child: Column(
         children: [
-          Container(
-            width: 104,
-            height: 104,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: AppColors.sleepGradient,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.softGlow,
-                  blurRadius: 42,
-                  offset: Offset(0, 18),
+          // ── Avatar ──────────────────────────────────────────────────────
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              GestureDetector(
+                onTap: _handlePickAndUploadPhoto,
+                child: Container(
+                  width: 104,
+                  height: 104,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: AppColors.sleepGradient,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.softGlow,
+                        blurRadius: 42,
+                        offset: Offset(0, 18),
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: _isUploadingPhoto
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: AppColors.onPrimary,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : _buildAvatarContent(displayName, photoUrl),
+                  ),
+                ),
+              ),
+              // Tombol edit kecil di pojok kanan bawah avatar
+              GestureDetector(
+                onTap: _handlePickAndUploadPhoto,
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primary,
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_rounded,
+                    size: 16,
+                    color: AppColors.onPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // ── Nama (tap untuk edit) ────────────────────────────────────────
+          GestureDetector(
+            onTap: () => _handleEditDisplayName(displayName),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  displayName,
+                  style: AppTextStyles.headline,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.edit_rounded,
+                  size: 16,
+                  color: AppColors.onSurfaceMuted,
                 ),
               ],
             ),
-            child: Center(
-              child: Text(
-                _getInitial(displayName),
-                style: AppTextStyles.displayMedium.copyWith(
-                  color: AppColors.onPrimary,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            displayName,
-            style: AppTextStyles.headline,
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),
           Text(
@@ -634,6 +879,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ],
           _buildStatusPill(accountStatus),
         ],
+      ),
+    );
+  }
+
+  /// Konten avatar: foto dari Storage/local preview, atau initial name.
+  Widget _buildAvatarContent(String displayName, String? photoUrl) {
+    // Preview lokal (baru dipilih, belum selesai upload)
+    if (_localPhotoPreview != null) {
+      return Image.file(_localPhotoPreview!, fit: BoxFit.cover);
+    }
+    // Foto dari Firebase Storage
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return Image.network(
+        photoUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildInitialAvatar(displayName),
+      );
+    }
+    // Fallback: initial huruf pertama
+    return _buildInitialAvatar(displayName);
+  }
+
+  Widget _buildInitialAvatar(String displayName) {
+    return Center(
+      child: Text(
+        _getInitial(displayName),
+        style: AppTextStyles.displayMedium.copyWith(
+          color: AppColors.onPrimary,
+        ),
       ),
     );
   }
@@ -808,6 +1082,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildAccountSection({
     required String email,
     required String sleepGoal,
+    required int sleepGoalInt,
     required String accountStatus,
     required String joinInfo,
   }) {
@@ -822,10 +1097,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           value: email,
         ),
         const SizedBox(height: 10),
-        _buildProfileInfoRow(
-          icon: Icons.nightlight_round,
-          label: 'Sleep Goal',
-          value: sleepGoal,
+        // Sleep goal — bisa diklik untuk edit
+        GestureDetector(
+          onTap: () => _handleEditSleepGoal(sleepGoalInt),
+          child: _buildProfileInfoRow(
+            icon: Icons.nightlight_round,
+            label: 'Sleep Goal',
+            value: sleepGoal,
+            trailing: const Icon(
+              Icons.edit_rounded,
+              size: 16,
+              color: AppColors.onSurfaceMuted,
+            ),
+          ),
         ),
         const SizedBox(height: 10),
         _buildProfileInfoRow(
@@ -840,6 +1124,121 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           value: joinInfo,
         ),
       ],
+    );
+  }
+
+  Widget _buildDiseaseHistorySection() {
+    final historyAsync = ref.watch(diseaseHistoryProvider);
+
+    return AppCard(
+      color: AppColors.surfaceContainerHigh,
+      padding: const EdgeInsets.all(22),
+      radius: 34,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.surfaceContainerHighest,
+                ),
+                child: const Icon(
+                  Icons.health_and_safety_rounded,
+                  color: AppColors.primaryFixedDim,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Riwayat Penyakit', style: AppTextStyles.cardTitle),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Digunakan sebagai konteks analisis AI.',
+                      style: AppTextStyles.small,
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: _goToDiseaseHistory,
+                child: const Text('Kelola'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          historyAsync.when(
+            loading: () => const LinearProgressIndicator(
+              minHeight: 4,
+              color: AppColors.primary,
+              backgroundColor: AppColors.surfaceVariant,
+            ),
+            error: (_, __) => Text(
+              'Gagal memuat riwayat penyakit.',
+              style: AppTextStyles.small.copyWith(color: AppColors.error),
+            ),
+            data: (list) {
+              if (list.isEmpty) {
+                return Text(
+                  'Belum ada riwayat penyakit. Ketuk "Kelola" untuk menambahkan.',
+                  style: AppTextStyles.small.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: list.take(3).map((entry) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.circle,
+                          size: 6,
+                          color: AppColors.primaryFixedDim,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            entry.diagnosedAt != null
+                                ? '${entry.name} (${entry.diagnosedAt!.year})'
+                                : entry.name,
+                            style: AppTextStyles.small.copyWith(
+                              color: AppColors.onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList()
+                  ..addAll(
+                    list.length > 3
+                        ? [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                '+${list.length - 3} lainnya',
+                                style: AppTextStyles.small.copyWith(
+                                  color: AppColors.onSurfaceMuted,
+                                ),
+                              ),
+                            ),
+                          ]
+                        : [],
+                  ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -1111,6 +1510,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required IconData icon,
     required String label,
     required String value,
+    Widget? trailing,
   }) {
     return AppCard(
       color: AppColors.surfaceLow,
@@ -1130,6 +1530,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (trailing != null) ...[
+            const SizedBox(width: 6),
+            trailing,
+          ],
         ],
       ),
     );

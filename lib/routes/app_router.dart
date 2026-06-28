@@ -14,6 +14,7 @@ import '../features/home/home_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/reports/reports_screen.dart';
 import '../features/achievements/achievements_screen.dart';
+import '../features/profile/disease_history_screen.dart';
 
 class AppRoutePath {
   static const String login = '/login';
@@ -26,6 +27,7 @@ class AppRoutePath {
   static const String hiveTest = '/hive-test';
   static const String achievements = '/achievements';
   static const String forum = '/forum';
+  static const String diseaseHistory = '/disease-history';
 }
 
 class AppRouter {
@@ -99,6 +101,10 @@ class AppRouter {
       GoRoute(
         path: AppRoutePath.forum,
         builder: (context, state) => const ForumScreenWrapper(),
+      ),
+      GoRoute(
+        path: AppRoutePath.diseaseHistory,
+        builder: (context, state) => const DiseaseHistoryScreen(),
       ),
     ],
   );

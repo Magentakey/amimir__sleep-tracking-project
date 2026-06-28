@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/daily_log.dart';
+import '../models/disease_history.dart';
 import '../models/sleep_log.dart';
 import 'meal_image_analysis_service.dart';
 
@@ -36,6 +37,7 @@ class AiAnalysisService {
     required List<SleepLog> sleepLogs,
     required List<DailyLog> dailyLogs,
     required List<DateTime> missingSleepDates,
+    List<DiseaseHistory> diseaseHistory = const [],
   }) async {
     if (_apiKey.isEmpty) {
       throw Exception(
@@ -59,6 +61,7 @@ class AiAnalysisService {
       dailyLogs: dailyLogs,
       missingSleepDates: missingSleepDates,
       mealImageAnalysisText: mealImageAnalysisText,
+      diseaseHistory: diseaseHistory,
     );
 
     final Map<String, dynamic> requestBody = {
@@ -151,6 +154,7 @@ class AiAnalysisService {
     required List<DailyLog> dailyLogs,
     required List<DateTime> missingSleepDates,
     required String mealImageAnalysisText,
+    List<DiseaseHistory> diseaseHistory = const [],
   }) {
     final List<SleepLog> safeSleepLogs = _limitSleepLogs(sleepLogs);
     final List<DailyLog> safeDailyLogs = _limitDailyLogs(dailyLogs);
@@ -158,6 +162,7 @@ class AiAnalysisService {
     final String sleepSummary = _buildSleepSummaryText(safeSleepLogs);
     final String dailySummary = _buildDailySummaryText(safeDailyLogs);
     final String missingDateText = _buildMissingDateText(missingSleepDates);
+    final String diseaseText = _buildDiseaseHistoryText(diseaseHistory);
 
     return '''
 Kamu adalah asisten analisis tidur untuk aplikasi sleep tracking bernama Amimir.
@@ -172,6 +177,7 @@ Jika data tambahan tersedia, wajib bahas data tambahan tersebut.
 Jika data meal image recognition tersedia, wajib bahas pengaruh makanan terhadap tidur secara wajar.
 Jika data tambahan tidak tersedia, jelaskan bahwa analisis menjadi lebih terbatas.
 Jika ada tanggal tanpa sleep log, jelaskan bahwa konsistensi data belum lengkap.
+Jika riwayat penyakit tersedia, pertimbangkan kondisi kesehatan user dalam rekomendasi tidur — tanpa membuat diagnosis medis baru.
 
 Balas hanya dalam JSON valid.
 Jangan gunakan markdown.
@@ -200,11 +206,15 @@ Aturan isi:
 - Jika meal image recognition menunjukkan makanan berat, berminyak, manis, atau kemungkinan berdampak pada tidur, bahas secara wajar.
 - Jika meal image recognition gagal, jangan mengarang isi makanan.
 - Jika data bolong, sebutkan secara wajar bahwa data belum konsisten.
+- Jika riwayat penyakit tersedia, sebutkan dalam konteks rekomendasi tidur. Misalnya: penderita diabetes perlu menjaga konsistensi jam tidur, penderita hipertensi sebaiknya hindari kafein malam hari, dll.
 
 Periode Analisis:
 - Jenis periode: $periodType
 - Mulai: ${periodStart.toIso8601String()}
 - Selesai: ${periodEnd.toIso8601String()}
+
+Riwayat Penyakit User:
+$diseaseText
 
 Data Tidur:
 $sleepSummary
@@ -361,6 +371,33 @@ $missingDateText
         : missingDates.sublist(0, 30);
 
     return safeMissingDates.map(_formatDate).join(', ');
+  }
+
+  /// Mengubah list [DiseaseHistory] menjadi teks konteks untuk prompt AI.
+  /// Jika kosong, AI diberitahu tidak ada riwayat — supaya tidak mengarang.
+  String _buildDiseaseHistoryText(List<DiseaseHistory> diseases) {
+    if (diseases.isEmpty) {
+      return 'Tidak ada riwayat penyakit yang tercatat oleh user.';
+    }
+
+    final StringBuffer buffer = StringBuffer();
+
+    for (int i = 0; i < diseases.length; i++) {
+      final DiseaseHistory d = diseases[i];
+      buffer.write('${i + 1}. ${d.name}');
+
+      if (d.diagnosedAt != null) {
+        buffer.write(' (terdiagnosa tahun ${d.diagnosedAt!.year})');
+      }
+
+      if (d.note.isNotEmpty) {
+        buffer.write(' — catatan: ${d.note}');
+      }
+
+      buffer.writeln();
+    }
+
+    return buffer.toString().trim();
   }
 
   String _extractTextFromResponse(Map<String, dynamic> json) {
