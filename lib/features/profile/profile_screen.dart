@@ -1387,22 +1387,45 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               style: AppTextStyles.small,
             ),
             const SizedBox(height: 12),
-            // ── Test button — hapus setelah confirmed bekerja ────────────
-            OutlinedButton.icon(
-              onPressed: () async {
-                await NotificationService().scheduleTestNotification();
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Test notifikasi dijadwalkan — '
-                      'akan muncul dalam ~1 menit.',
-                    ),
+            // ── Test buttons — hapus setelah confirmed bekerja ───────────
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await NotificationService()
+                          .showImmediateTestNotification();
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Test langsung dipanggil — '
+                            'notifikasi harusnya muncul sekarang.',
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.flash_on_rounded, size: 16),
+                    label: const Text('Test Langsung'),
                   ),
-                );
-              },
-              icon: const Icon(Icons.bug_report_rounded, size: 18),
-              label: const Text('Test Notifikasi (1 menit)'),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await NotificationService().scheduleTestNotification();
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Test terjadwal — muncul ~1 menit.'),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.timer_outlined, size: 16),
+                    label: const Text('Test 1 Menit'),
+                  ),
+                ),
+              ],
             ),
             // ─────────────────────────────────────────────────────────────
           ],
