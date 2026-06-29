@@ -1386,6 +1386,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               'Notifikasi muncul setiap hari pukul $timeLabel.',
               style: AppTextStyles.small,
             ),
+            const SizedBox(height: 12),
+            // ── Test button — hapus setelah confirmed bekerja ────────────
+            OutlinedButton.icon(
+              onPressed: () async {
+                await NotificationService().scheduleTestNotification();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Test notifikasi dijadwalkan — '
+                      'akan muncul dalam ~1 menit.',
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.bug_report_rounded, size: 18),
+              label: const Text('Test Notifikasi (1 menit)'),
+            ),
+            // ─────────────────────────────────────────────────────────────
           ],
         ],
       ),

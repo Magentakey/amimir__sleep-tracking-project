@@ -134,7 +134,6 @@ class NotificationService {
   Future<void> scheduleDailyLogReminder({required TimeOfDay time}) async {
     if (!_initialized) await initialize();
 
-    // Batalkan jadwal lama sebelum buat yang baru
     await cancelDailyLogReminder();
 
     final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
@@ -148,10 +147,16 @@ class NotificationService {
       time.minute,
     );
 
-    // Kalau waktu hari ini sudah lewat, jadwalkan untuk besok
     if (scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
+
+    // ── Debug log — hapus setelah notification confirmed bekerja ──────────
+    debugPrint('[NotifService] timezone   : ${tz.local.name}');
+    debugPrint('[NotifService] now (local) : $now');
+    debugPrint('[NotifService] scheduled   : $scheduledDate');
+    debugPrint('[NotifService] time set    : ${time.hour}:${time.minute}');
+    // ──────────────────────────────────────────────────────────────────────
 
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
@@ -165,16 +170,54 @@ class NotificationService {
           autoCancel: true,
         );
 
+    try {
+      await _plugin.zonedSchedule(
+        _dailyReminderNotificationId,
+        '📝  Waktunya catat harianmu!',
+        'Jangan lupa isi mood, aktivitas, kafein, dan data makanan hari ini.',
+        scheduledDate,
+        const NotificationDetails(android: androidDetails),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      debugPrint('[NotifService] zonedSchedule SUCCESS');
+    } catch (e) {
+      debugPrint('[NotifService] zonedSchedule ERROR: $e');
+      rethrow;
+    }
+  }
+
+  /// Test: kirim notifikasi dalam 1 menit dari sekarang (tanpa repeat).
+  /// Dipakai untuk verifikasi bahwa pipeline notifikasi bekerja.
+  /// Hapus setelah confirmed bekerja.
+  Future<void> scheduleTestNotification() async {
+    if (!_initialized) await initialize();
+
+    final tz.TZDateTime fireAt =
+        tz.TZDateTime.now(tz.local).add(const Duration(minutes: 1));
+
+    debugPrint('[NotifService] TEST notif scheduled at: $fireAt');
+
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          _dailyReminderChannelId,
+          _dailyReminderChannelName,
+          channelDescription: _dailyReminderChannelDesc,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+          autoCancel: true,
+        );
+
     await _plugin.zonedSchedule(
-      _dailyReminderNotificationId,
-      '📝  Waktunya catat harianmu!',
-      'Jangan lupa isi mood, aktivitas, kafein, dan data makanan hari ini.',
-      scheduledDate,
+      9999,
+      '✅ Test Notifikasi Amimir',
+      'Notifikasi berhasil! Pipeline notifikasi bekerja dengan benar.',
+      fireAt,
       const NotificationDetails(android: androidDetails),
-      // exactAllowWhileIdle: notif dijamin tepat waktu, tidak bisa
-      // ditunda OS meski device idle/Doze/battery saver (Samsung friendly).
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
