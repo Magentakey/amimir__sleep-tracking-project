@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:workmanager/workmanager.dart';
 
 import '../../core/constants/app_colors.dart';
-import '../../core/services/notification_service.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_card.dart';
 import '../../core/widgets/app_scaffold.dart';
@@ -1403,48 +1402,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               'Notifikasi muncul setiap hari pukul $timeLabel.',
               style: AppTextStyles.small,
             ),
-            const SizedBox(height: 12),
-            // ── Test buttons — hapus setelah confirmed bekerja ───────────
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      await NotificationService()
-                          .showImmediateTestNotification();
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Test langsung dipanggil — '
-                            'notifikasi harusnya muncul sekarang.',
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.flash_on_rounded, size: 16),
-                    label: const Text('Test Langsung'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      await NotificationService().scheduleTestNotification();
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Test terjadwal — muncul ~1 menit.'),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.timer_outlined, size: 16),
-                    label: const Text('Test 1 Menit'),
-                  ),
-                ),
-              ],
-            ),
-            // ─────────────────────────────────────────────────────────────
           ],
         ],
       ),

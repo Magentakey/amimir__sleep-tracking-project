@@ -14,17 +14,17 @@ import 'core/widgets/session_gate.dart';
 import 'data/local/local_settings_service.dart';
 import 'firebase_options.dart';
 
-/// Nama task WorkManager untuk pengingat harian.
+/// Nama unik task WorkManager untuk pengingat harian.
 const String kDailyReminderTask = 'amimir_daily_reminder_task';
 
 /// Callback yang dijalankan WorkManager di background (isolate terpisah).
-/// Harus top-level function dan diberi @pragma supaya tidak ter-tree-shake.
 ///
-/// Kenapa WorkManager dan bukan zonedSchedule:
-/// flutter_local_notifications pakai AlarmManager → BroadcastReceiver yang
-/// Samsung agresif kill sebelum sempat post notification. WorkManager pakai
-/// JobScheduler yang Samsung tidak bisa kill sembarangan — dirancang khusus
-/// untuk background tasks yang wajib selesai.
+/// Kenapa WorkManager dan bukan AlarmManager (zonedSchedule):
+/// Samsung (One UI) agresif mematikan BroadcastReceiver dari AlarmManager
+/// sebelum sempat menampilkan notifikasi, meski alarm-nya sendiri terbukti
+/// fired tepat waktu (verified via `adb shell dumpsys alarm`). WorkManager
+/// memakai JobScheduler yang tidak diperlakukan sama oleh Samsung — jadi
+/// notifikasi benar-benar muncul.
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((taskName, inputData) async {
@@ -33,7 +33,7 @@ void callbackDispatcher() {
     try {
       WidgetsFlutterBinding.ensureInitialized();
 
-      // Timezone wajib di-init juga di isolate background
+      // Timezone wajib di-init ulang karena ini isolate terpisah dari main()
       tz.initializeTimeZones();
       try {
         final String deviceTz = await FlutterTimezone.getLocalTimezone();
@@ -42,14 +42,16 @@ void callbackDispatcher() {
         tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
       }
 
-      // Tampilkan notifikasi sekarang (show() bukan zonedSchedule)
       await NotificationService().initialize();
       await NotificationService().showDailyReminderNow();
 
-      // Jadwal ulang untuk besok di jam yang sama
+      // Jadwal ulang untuk besok di jam yang sama — WorkManager task ini
+      // bersifat one-off, jadi perlu re-register setiap kali fire supaya
+      // jadi pengingat harian yang berulang.
       final int hour = inputData?['hour'] as int? ?? 21;
       final int minute = inputData?['minute'] as int? ?? 0;
-      final Duration delay = _delayUntilNext(TimeOfDay(hour: hour, minute: minute));
+      final Duration delay =
+          _delayUntilNext(TimeOfDay(hour: hour, minute: minute));
 
       await Workmanager().registerOneOffTask(
         kDailyReminderTask,
@@ -59,21 +61,20 @@ void callbackDispatcher() {
         existingWorkPolicy: ExistingWorkPolicy.replace,
         constraints: Constraints(networkType: NetworkType.notRequired),
       );
-
-      debugPrint('[WorkManager] reminder shown, next in ${delay.inHours}h ${delay.inMinutes % 60}m');
-    } catch (e) {
-      debugPrint('[WorkManager] error: $e');
+    } catch (_) {
+      // Gagal diam-diam — tidak ada UI untuk menampilkan error di background
     }
 
     return true;
   });
 }
 
-/// Hitung durasi sampai jam [time] berikutnya.
+/// Hitung durasi sampai jam [time] berikutnya (hari ini kalau belum lewat,
+/// besok kalau sudah lewat).
 Duration _delayUntilNext(TimeOfDay time) {
   final DateTime now = DateTime.now();
-  DateTime next = DateTime(now.year, now.month, now.day, time.hour, time.minute);
-  // Kalau sudah lewat (atau kurang dari 30 detik ke depan), ambil besok
+  DateTime next =
+      DateTime(now.year, now.month, now.day, time.hour, time.minute);
   if (next.difference(now).inSeconds < 30) {
     next = next.add(const Duration(days: 1));
   }
@@ -101,12 +102,10 @@ Future<void> main() async {
   // ── Notifikasi & WorkManager ───────────────────────────────────────────────
   await NotificationService().initialize();
   await NotificationService().requestPermissions();
-
-  // Init WorkManager dengan callback dispatcher
   await Workmanager().initialize(callbackDispatcher);
 
-  // Jadwal ulang WorkManager reminder kalau sebelumnya aktif
-  // (menangani kasus app di-reinstall atau HP restart)
+  // Jadwal ulang reminder kalau sebelumnya aktif (menangani app reinstall
+  // atau HP restart, di mana semua task WorkManager terhapus oleh OS)
   final LocalSettingsService settings = LocalSettingsService();
   if (settings.getReminderEnabled()) {
     final TimeOfDay time = settings.getReminderTime();
