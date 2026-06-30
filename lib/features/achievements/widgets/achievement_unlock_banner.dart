@@ -167,47 +167,55 @@ class _AchievementUnlockBannerState
     final String rarityLabel = _rarityLabel(achievement.rarity);
     final IconData rarityIcon = _rarityIcon(achievement.rarity);
 
-    return GestureDetector(
-      onTap: _dismiss,
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: rarityColor.withValues(alpha: 0.5),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: rarityColor.withValues(alpha: 0.22),
-              blurRadius: 28,
-              offset: const Offset(0, 10),
+    // DefaultTextStyle.merge memaksa decoration: none ke semua Text di
+    // dalam banner ini, apa pun sumber underline yang ter-inherit.
+    // Banner ini dipasang di luar Scaffold/Material (lewat builder di
+    // app.dart), jadi tidak otomatis dapat default text style "rapi"
+    // seperti widget lain yang ada di dalam Material — itu sebabnya
+    // semua teks di banner sebelumnya tampil underline.
+    return DefaultTextStyle.merge(
+      style: const TextStyle(decoration: TextDecoration.none),
+      child: GestureDetector(
+        onTap: _dismiss,
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: rarityColor.withValues(alpha: 0.5),
+              width: 1.2,
             ),
-            const BoxShadow(
-              color: AppColors.ambientShadow,
-              blurRadius: 12,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        child: Row(
-          children: [
-            // ── Ikon rarity ──────────────────────────────────────────────────
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: rarityColor.withValues(alpha: 0.15),
-                border: Border.all(
-                  color: rarityColor.withValues(alpha: 0.55),
-                  width: 1.5,
-                ),
+            boxShadow: [
+              BoxShadow(
+                color: rarityColor.withValues(alpha: 0.22),
+                blurRadius: 28,
+                offset: const Offset(0, 10),
               ),
-              child: Icon(rarityIcon, color: rarityColor, size: 26),
-            ),
-            const SizedBox(width: 14),
+              const BoxShadow(
+                color: AppColors.ambientShadow,
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          child: Row(
+            children: [
+              // ── Ikon rarity ──────────────────────────────────────────────────
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: rarityColor.withValues(alpha: 0.15),
+                  border: Border.all(
+                    color: rarityColor.withValues(alpha: 0.55),
+                    width: 1.5,
+                  ),
+                ),
+                child: Icon(rarityIcon, color: rarityColor, size: 26),
+              ),
+              const SizedBox(width: 14),
 
             // ── Teks ─────────────────────────────────────────────────────────
             Expanded(
@@ -279,8 +287,9 @@ class _AchievementUnlockBannerState
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ─── Helper rarity ────────────────────────────────────────────────────────
 

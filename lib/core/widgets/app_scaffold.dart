@@ -165,7 +165,6 @@ class AppScaffold extends StatelessWidget {
                     activeIcon: Icon(Icons.auto_awesome_rounded),
                     label: 'Analysis',
                   ),
-                  // ── NEW ───────────────────────────────────────
                   BottomNavigationBarItem(
                     icon: Icon(Icons.forum_outlined),
                     activeIcon: Icon(Icons.forum_rounded),
