@@ -150,6 +150,34 @@ class NotificationService {
     await _plugin.cancel(_dailyReminderNotificationId);
   }
 
+  /// Tampilkan notifikasi pengingat harian SEKARANG menggunakan show()
+  /// biasa — bukan zonedSchedule. Dipanggil oleh WorkManager callback
+  /// di background. show() jauh lebih reliable dari BroadcastReceiver
+  /// karena tidak bergantung pada AlarmManager yang bisa di-kill Samsung.
+  Future<void> showDailyReminderNow() async {
+    if (!_initialized) await initialize();
+
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          _dailyReminderChannelId,
+          _dailyReminderChannelName,
+          channelDescription: _dailyReminderChannelDesc,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+          color: Color(0xFFBAC3FF),
+          autoCancel: true,
+        );
+
+    await _plugin.show(
+      _dailyReminderNotificationId,
+      '📝  Waktunya catat harianmu!',
+      'Jangan lupa isi mood, aktivitas, kafein, dan data makanan hari ini.',
+      const NotificationDetails(android: androidDetails),
+    );
+    debugPrint('[NotifService] showDailyReminderNow() called');
+  }
+
   // ─── Test methods ─────────────────────────────────────────────────────────
 
   /// Test LANGSUNG — show() bukan scheduled. Untuk cek apakah channel

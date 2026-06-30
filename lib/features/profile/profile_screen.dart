@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:workmanager/workmanager.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/services/notification_service.dart';
@@ -15,6 +16,7 @@ import '../../data/models/achievement.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/backup_repository.dart';
 import '../../data/repositories/profile_repository.dart';
+import '../../main.dart' show kDailyReminderTask;
 import '../../routes/app_router.dart';
 import '../achievements/achievement_providers.dart';
 import '../daily_log/daily_log_providers.dart';
@@ -480,21 +482,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     await _settingsService.setReminderEnabled(value);
 
     if (value) {
-      // Android 12+ butuh izin SCHEDULE_EXACT_ALARM untuk notifikasi
-      // tepat waktu. Minta izin dulu, baru jadwalkan.
-      final bool canExact =
-          await NotificationService().canScheduleExactAlarms();
-      if (!canExact) {
-        await NotificationService().requestExactAlarmPermission();
-        // Setelah kembali dari settings, coba jadwalkan.
-        // Kalau user tidak izinkan, notifikasi tetap terjadwal tapi
-        // mungkin ditunda OS (fallback ke inexact behaviour).
-      }
-      await NotificationService().scheduleDailyLogReminder(
-        time: _reminderTime,
-      );
+      await _scheduleWorkManagerReminder(_reminderTime);
     } else {
-      await NotificationService().cancelDailyLogReminder();
+      await Workmanager().cancelByUniqueName(kDailyReminderTask);
     }
 
     if (!mounted) return;
@@ -526,13 +516,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     await _settingsService.setReminderTime(picked);
 
     if (_reminderEnabled) {
-      await NotificationService().scheduleDailyLogReminder(time: picked);
+      await _scheduleWorkManagerReminder(picked);
     }
 
     if (!mounted) return;
     setState(() {
       _reminderTime = picked;
     });
+  }
+
+  /// Jadwalkan WorkManager one-off task untuk jam [time].
+  /// Task akan menampilkan notifikasi via show() (bukan BroadcastReceiver)
+  /// dan otomatis re-schedule dirinya sendiri untuk keesokan harinya.
+  Future<void> _scheduleWorkManagerReminder(TimeOfDay time) async {
+    final DateTime now = DateTime.now();
+    DateTime next = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+    if (next.difference(now).inSeconds < 30) {
+      next = next.add(const Duration(days: 1));
+    }
+    final Duration delay = next.difference(now);
+
+    await Workmanager().registerOneOffTask(
+      kDailyReminderTask,
+      kDailyReminderTask,
+      initialDelay: delay,
+      inputData: {'hour': time.hour, 'minute': time.minute},
+      existingWorkPolicy: ExistingWorkPolicy.replace,
+      constraints: Constraints(networkType: NetworkType.notRequired),
+    );
+
+    debugPrint(
+      '[Profile] WorkManager reminder scheduled: '
+      '${time.hour}:${time.minute.toString().padLeft(2, '0')} '
+      '(in ${delay.inHours}h ${delay.inMinutes % 60}m)',
+    );
   }
 
   String _getDisplayName({
