@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/legacy.dart';
 
 import '../../data/local/local_achievement_service.dart';
 import '../../data/models/achievement.dart';
+import '../../data/models/app_notification.dart';
 import '../../data/repositories/analysis_repository.dart';
 import '../analysis/analysis_providers.dart';
 import '../daily_log/daily_log_providers.dart';
+import '../notifications/app_notifications_provider.dart';
 import '../sleep/sleep_providers.dart';
 
 // ─── Service provider ─────────────────────────────────────────────────────────
@@ -72,9 +74,28 @@ class AchievementProgressNotifier
     // Kalau ada achievement baru, masukkan ke antrian banner in-app.
     // ref.read (bukan ref.watch) karena ini side-effect, bukan dependency.
     if (result.newlyUnlocked.isNotEmpty) {
-      ref.read(achievementUnlockQueueProvider.notifier).update(
-        (state) => [...state, ...result.newlyUnlocked],
-      );
+      ref
+          .read(achievementUnlockQueueProvider.notifier)
+          .update((state) => [...state, ...result.newlyUnlocked]);
+
+      // Catat juga ke riwayat notifikasi lonceng (dropdown top bar) —
+      // beda dari banner yang cuma tampil 4 detik lalu hilang, entry di
+      // dropdown ini tetap ada sampai user buka dropdown-nya.
+      final appNotificationService = ref.read(appNotificationServiceProvider);
+
+      for (final AchievementDefinition def in result.newlyUnlocked) {
+        await appNotificationService.add(
+          AppNotification(
+            id: 'achievement_${def.id}_${DateTime.now().millisecondsSinceEpoch}',
+            type: AppNotificationType.achievement,
+            title: 'Achievement Unlocked: ${def.title}',
+            body: def.description,
+            createdAt: DateTime.now(),
+          ),
+        );
+      }
+
+      ref.read(appNotificationsProvider.notifier).refresh();
     }
 
     return result.all;

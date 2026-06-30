@@ -14,6 +14,7 @@ class LocalSettingsService {
   static const String _reminderEnabledKey = 'daily_reminder_enabled';
   static const String _reminderHourKey = 'daily_reminder_hour';
   static const String _reminderMinuteKey = 'daily_reminder_minute';
+  static const String _lastUidKey = 'last_logged_in_uid';
 
   /// Default waktu pengingat: 21:00
   static const int _defaultHour = 21;
@@ -44,5 +45,20 @@ class LocalSettingsService {
   Future<void> setReminderTime(TimeOfDay time) async {
     await _box.put(_reminderHourKey, time.hour);
     await _box.put(_reminderMinuteKey, time.minute);
+  }
+
+  // ─── Last logged-in UID ─────────────────────────────────────────────────────
+  // Dipakai oleh WorkManager callback (background isolate) yang tidak
+  // tahu siapa user yang sedang login di isolate utama (UserSessionService
+  // bersifat in-memory, tidak ikut ter-share ke isolate terpisah).
+  // Disimpan di box global ini supaya callback bisa tahu box notifikasi
+  // siapa yang harus ditulis saat pengingat harian fire.
+
+  String? getLastUid() {
+    return _box.get(_lastUidKey) as String?;
+  }
+
+  Future<void> setLastUid(String uid) async {
+    await _box.put(_lastUidKey, uid);
   }
 }

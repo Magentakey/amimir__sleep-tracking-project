@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/achievements/achievement_providers.dart';
 import '../../features/daily_log/daily_log_providers.dart';
+import '../../features/notifications/app_notifications_provider.dart';
 import '../../features/sleep/sleep_providers.dart';
+import '../../data/local/local_settings_service.dart';
 import '../services/user_session_service.dart';
 import '../theme/app_theme.dart';
 
@@ -57,6 +59,13 @@ class _SessionGateState extends ConsumerState<SessionGate> {
       await UserSessionService.closeCurrentUserBoxes();
     } else {
       await UserSessionService.openBoxesForUser(user.uid);
+
+      // Simpan UID terakhir yang login ke box global, supaya WorkManager
+      // callback (background isolate, lihat main.dart) tahu box notifikasi
+      // siapa yang harus ditulis saat pengingat harian fire — isolate itu
+      // tidak bisa baca UserSessionService.currentUid karena itu
+      // in-memory dan tidak ikut ter-share antar isolate.
+      await LocalSettingsService().setLastUid(user.uid);
     }
 
     // Provider data lama bisa jadi masih nyangkut punya akun sebelumnya
@@ -64,6 +73,7 @@ class _SessionGateState extends ConsumerState<SessionGate> {
     ref.invalidate(allSleepLogsProvider);
     ref.invalidate(todayDailyLogProvider);
     ref.invalidate(achievementProgressProvider);
+    ref.invalidate(appNotificationsProvider);
 
     if (mounted) {
       setState(() {

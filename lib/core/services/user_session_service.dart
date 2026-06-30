@@ -25,12 +25,14 @@ class UserSessionService {
   static const String dailyLogsPrefix = 'local_daily_logs';
   static const String analysisCachePrefix = 'local_analysis_cache';
   static const String achievementsPrefix = 'local_achievements';
+  static const String appNotificationsPrefix = 'local_app_notifications';
 
   static const List<String> _allPrefixes = [
     sleepLogsPrefix,
     dailyLogsPrefix,
     analysisCachePrefix,
     achievementsPrefix,
+    appNotificationsPrefix,
   ];
 
   /// Nama box untuk [prefix] milik [uid] tertentu.

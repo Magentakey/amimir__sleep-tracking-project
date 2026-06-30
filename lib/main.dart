@@ -11,7 +11,9 @@ import 'app.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/user_session_service.dart';
 import 'core/widgets/session_gate.dart';
+import 'data/local/local_app_notification_service.dart';
 import 'data/local/local_settings_service.dart';
+import 'data/models/app_notification.dart';
 import 'firebase_options.dart';
 
 /// Nama unik task WorkManager untuk pengingat harian.
@@ -45,6 +47,15 @@ void callbackDispatcher() {
       await NotificationService().initialize();
       await NotificationService().showDailyReminderNow();
 
+      // Catat juga ke riwayat notifikasi in-app (dropdown lonceng) supaya
+      // muncul di sana saat user buka app lagi — bukan cuma notifikasi OS.
+      //
+      // Isolate ini terpisah dari isolate utama app, jadi tidak tahu
+      // UserSessionService.currentUid (itu in-memory, tidak ter-share
+      // antar isolate). Makanya baca UID terakhir dari box global
+      // 'local_settings' yang ditulis SessionGate setiap kali user login.
+      await _writeDailyReminderNotification();
+
       // Jadwal ulang untuk besok di jam yang sama — WorkManager task ini
       // bersifat one-off, jadi perlu re-register setiap kali fire supaya
       // jadi pengingat harian yang berulang.
@@ -67,6 +78,59 @@ void callbackDispatcher() {
 
     return true;
   });
+}
+
+/// Tulis entry notifikasi pengingat harian ke Hive, supaya muncul di
+/// dropdown lonceng saat user buka app lagi. Dipanggil dari dalam
+/// [callbackDispatcher] (background isolate WorkManager).
+///
+/// Hive di isolate ini belum pernah di-init (beda isolate dari main()),
+/// jadi perlu initFlutter() + buka box sendiri di sini, lalu ditutup lagi
+/// di akhir supaya tidak mengganjal kalau isolate utama mau buka box yang
+/// sama saat app dibuka kembali.
+Future<void> _writeDailyReminderNotification() async {
+  try {
+    await Hive.initFlutter();
+
+    final bool settingsBoxAlreadyOpen = Hive.isBoxOpen(
+      LocalSettingsService.settingsBoxName,
+    );
+    final Box settingsBox = settingsBoxAlreadyOpen
+        ? Hive.box(LocalSettingsService.settingsBoxName)
+        : await Hive.openBox(LocalSettingsService.settingsBoxName);
+
+    final String? lastUid = LocalSettingsService().getLastUid();
+
+    if (lastUid == null) {
+      if (!settingsBoxAlreadyOpen) await settingsBox.close();
+      return;
+    }
+
+    final String notifBoxName = LocalAppNotificationService.boxNameForUid(
+      lastUid,
+    );
+    final bool notifBoxAlreadyOpen = Hive.isBoxOpen(notifBoxName);
+    final Box notifBox = notifBoxAlreadyOpen
+        ? Hive.box(notifBoxName)
+        : await Hive.openBox(notifBoxName);
+
+    final AppNotification notification = AppNotification(
+      id: 'reminder_${DateTime.now().millisecondsSinceEpoch}',
+      type: AppNotificationType.dailyReminder,
+      title: 'Waktunya catat harianmu!',
+      body:
+          'Jangan lupa isi mood, aktivitas, kafein, dan data makanan hari ini.',
+      createdAt: DateTime.now(),
+    );
+
+    await notifBox.put(notification.id, notification.toMap());
+
+    if (!notifBoxAlreadyOpen) await notifBox.close();
+    if (!settingsBoxAlreadyOpen) await settingsBox.close();
+  } catch (_) {
+    // Gagal diam-diam — notifikasi OS sudah tetap muncul lewat
+    // showDailyReminderNow(), ini cuma layer tambahan untuk dropdown.
+  }
 }
 
 /// Hitung durasi sampai jam [time] berikutnya (hari ini kalau belum lewat,
