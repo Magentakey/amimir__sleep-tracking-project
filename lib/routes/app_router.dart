@@ -9,7 +9,7 @@ import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/dev/hive_test_screen.dart';
-import '../features/forum/forum_screen.dart'; // ← NEW
+import '../features/forum/forum_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/reports/reports_screen.dart';

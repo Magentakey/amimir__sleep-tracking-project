@@ -8,7 +8,6 @@ import '../forum_providers.dart';
 
 const List<String> kForumCategories = [
   'Umum',
-  'Pertanyaan',
   'Sleep Tips',
   'Achievement',
   'Pengalaman',

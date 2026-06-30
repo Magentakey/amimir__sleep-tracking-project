@@ -73,6 +73,21 @@ class _AchievementUnlockBannerState
 
   @override
   Widget build(BuildContext context) {
+    // GLOBAL TRIGGER: widget ini selalu terpasang di root app (lihat
+    // app.dart), jadi men-watch achievementProgressProvider di sini
+    // membuat pengecekan achievement berjalan otomatis dari MANA SAJA —
+    // bukan cuma saat user membuka Profile/Achievements screen.
+    //
+    // Tanpa baris ini, ref.invalidate(achievementProgressProvider) yang
+    // dipanggil dari home_screen/dashboard_screen/analysis_screen cuma
+    // menandai provider "dirty" tanpa benar-benar menjalankan ulang
+    // build()-nya (AsyncNotifierProvider bersifat lazy — baru dihitung
+    // ulang saat ada yang men-watch/membaca). Itu sebabnya sebelumnya
+    // notifikasi achievement baru muncul setelah user balik ke menu
+    // Profile, karena di situlah provider ini pertama kali di-watch
+    // ulang setelah invalidate.
+    ref.watch(achievementProgressProvider);
+
     ref.listen<List<AchievementDefinition>>(achievementUnlockQueueProvider, (
       prev,
       next,

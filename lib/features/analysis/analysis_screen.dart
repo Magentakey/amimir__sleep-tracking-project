@@ -18,6 +18,7 @@ import '../daily_log/daily_log_providers.dart';
 import '../profile/disease_history_providers.dart';
 import '../sleep/sleep_providers.dart';
 import '../shared/selected_daily_date_provider.dart';
+import '../achievements/achievement_providers.dart';
 import 'analysis_providers.dart';
 
 enum AnalysisPeriod { daily, weekly, monthly }
@@ -232,6 +233,11 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
     );
 
     await _analysisRepository.saveAnalysisCache(cache);
+
+    // Achievement seperti "First Insight", "Weekly Reflection", dan
+    // "Monthly Reflection" bergantung pada jumlah analysis cache —
+    // invalidate supaya progress langsung terdeteksi setelah generate.
+    ref.invalidate(achievementProgressProvider);
 
     if (!mounted) {
       return;
