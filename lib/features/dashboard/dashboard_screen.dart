@@ -17,6 +17,7 @@ import '../../routes/app_router.dart';
 import '../daily_log/daily_log_providers.dart';
 import '../sleep/sleep_providers.dart';
 import '../achievements/achievement_providers.dart';
+import '../shared/selected_daily_date_provider.dart';
 import 'widgets/add_caffeine_dialog.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -72,7 +73,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     _localSleepService = ref.read(sleepLogRepositoryProvider);
     _dailyLogService = ref.read(dailyLogRepositoryProvider);
 
-    _selectedDailyDate = _getInitialSelectedDailyDate();
+    _selectedDailyDate = ref.read(selectedDailyDateProvider);
     _showMidnightWarning = _shouldShowMidnightWarning();
 
     _loadDashboardData();
@@ -83,17 +84,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     _conditionNoteController.dispose();
     _mealNoteEditController.dispose();
     super.dispose();
-  }
-
-  DateTime _getInitialSelectedDailyDate() {
-    final DateTime now = DateTime.now();
-    final DateTime today = _dateOnly(now);
-
-    if (now.hour >= 0 && now.hour < 4) {
-      return today.subtract(const Duration(days: 1));
-    }
-
-    return today;
   }
 
   bool _shouldShowMidnightWarning() {
@@ -173,15 +163,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   void _selectPreviousDay() {
     _unfocusKeyboard();
-
-    setState(() {
-      _selectedDailyDate = _selectedDailyDate.subtract(const Duration(days: 1));
-      _showMidnightWarning = false;
-      _editingMealIndex = null;
-      _mealNoteEditController.clear();
-    });
-
-    _loadDashboardData();
+    _setSelectedDailyDate(_selectedDailyDate.subtract(const Duration(days: 1)));
   }
 
   void _selectNextDay() {
@@ -192,14 +174,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       return;
     }
 
-    setState(() {
-      _selectedDailyDate = _selectedDailyDate.add(const Duration(days: 1));
-      _showMidnightWarning = false;
-      _editingMealIndex = null;
-      _mealNoteEditController.clear();
-    });
-
-    _loadDashboardData();
+    _setSelectedDailyDate(_selectedDailyDate.add(const Duration(days: 1)));
   }
 
   void _continuePreviousDay() {
@@ -209,25 +184,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       const Duration(days: 1),
     );
 
-    setState(() {
-      _selectedDailyDate = yesterday;
-      _showMidnightWarning = false;
-      _editingMealIndex = null;
-      _mealNoteEditController.clear();
-    });
-
-    _loadDashboardData();
+    _setSelectedDailyDate(yesterday);
   }
 
   void _startNewDay() {
     _unfocusKeyboard();
+    _setSelectedDailyDate(_todayDateOnly());
+  }
 
+  /// Ganti tanggal yang dipilih, lalu sinkronkan ke [selectedDailyDateProvider]
+  /// supaya Home dan Analysis ikut konsisten kalau user pindah halaman.
+  void _setSelectedDailyDate(DateTime newDate) {
     setState(() {
-      _selectedDailyDate = _todayDateOnly();
+      _selectedDailyDate = newDate;
       _showMidnightWarning = false;
       _editingMealIndex = null;
       _mealNoteEditController.clear();
     });
+
+    ref.read(selectedDailyDateProvider.notifier).state = newDate;
 
     _loadDashboardData();
   }

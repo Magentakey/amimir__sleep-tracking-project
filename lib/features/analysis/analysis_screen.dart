@@ -17,6 +17,7 @@ import '../../data/repositories/disease_history_repository.dart';
 import '../daily_log/daily_log_providers.dart';
 import '../profile/disease_history_providers.dart';
 import '../sleep/sleep_providers.dart';
+import '../shared/selected_daily_date_provider.dart';
 import 'analysis_providers.dart';
 
 enum AnalysisPeriod { daily, weekly, monthly }
@@ -61,23 +62,16 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
     _aiAnalysisService = ref.read(aiAnalysisServiceProvider);
     _diseaseHistoryRepository = ref.read(diseaseHistoryRepositoryProvider);
 
-    final DateTime defaultDate = _getDefaultAnalysisDate();
+    // Baca dari provider yang sama dipakai Home/Dashboard, supaya kalau
+    // user baru saja pilih tanggal di Dashboard lalu buka Analysis,
+    // tanggalnya tetap nyambung — bukan balik ke "tanggal sleep log
+    // terakhir" yang dihitung ulang dari nol setiap kali screen ini dibuka.
+    final DateTime defaultDate = ref.read(selectedDailyDateProvider);
 
     _selectedAnalysisDate = defaultDate;
     _selectedEndDate = defaultDate;
 
     _refreshAnalysisState();
-  }
-
-  DateTime _getDefaultAnalysisDate() {
-    final DateTime? latestSleepDate = _localSleepService
-        .getLatestSleepLogDate();
-
-    if (latestSleepDate != null) {
-      return _dateOnly(latestSleepDate);
-    }
-
-    return _dateOnly(DateTime.now());
   }
 
   void _changePeriod(AnalysisPeriod period) {
@@ -155,6 +149,10 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
     setState(() {
       if (_selectedPeriod == AnalysisPeriod.daily) {
         _selectedAnalysisDate = _dateOnly(pickedDate);
+        // Sync ke provider supaya Dashboard/Home ikut nyambung kalau user
+        // pindah halaman setelah pilih tanggal analysis secara manual.
+        ref.read(selectedDailyDateProvider.notifier).state =
+            _selectedAnalysisDate;
       } else {
         _selectedEndDate = _dateOnly(pickedDate);
       }

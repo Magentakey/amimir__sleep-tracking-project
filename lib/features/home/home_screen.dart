@@ -13,6 +13,7 @@ import '../../data/models/sleep_log.dart';
 import '../../routes/app_router.dart';
 import '../sleep/sleep_providers.dart';
 import '../achievements/achievement_providers.dart';
+import '../shared/selected_daily_date_provider.dart';
 
 enum SleepPreviewAction { save, edit, cancel }
 
@@ -46,7 +47,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _targetDailyDate = _resolveTargetDailyDate(widget.targetDailyDate);
+
+    // Prioritas tanggal: parameter eksplisit dari navigasi (mis. dari
+    // Dashboard) > tanggal yang sedang dipilih bersama di provider.
+    // Sebelumnya Home selalu menghitung ulang "hari ini" sendiri kalau
+    // tidak ada parameter, sehingga tidak nyambung dengan tanggal yang
+    // sedang dipilih user di Dashboard/Analysis.
+    _targetDailyDate = widget.targetDailyDate != null
+        ? _dateOnly(widget.targetDailyDate!)
+        : ref.read(selectedDailyDateProvider);
+
+    // Sinkronkan balik ke provider supaya Dashboard/Analysis tahu tanggal
+    // yang sedang aktif di sini juga, kalau-kalau Home dibuka dengan
+    // targetDailyDate eksplisit yang berbeda dari provider saat ini.
+    //
+    // Ditunda dengan addPostFrameCallback karena provider tidak boleh
+    // ditulis langsung di dalam initState() — widget tree masih dalam
+    // proses dibangun saat initState() berjalan, jadi Riverpod menolak
+    // modifikasi provider di titik ini (akan throw
+    // "Tried to modify a provider while the widget tree was building").
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(selectedDailyDateProvider.notifier).state = _targetDailyDate;
+    });
+
     _loadSleepLogForTargetDate();
     _restoreActiveSleepSession();
   }
