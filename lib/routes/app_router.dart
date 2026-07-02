@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/analysis/analysis_screen.dart';
+import '../features/auth/email_verification_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
@@ -19,6 +20,7 @@ import '../features/profile/disease_history_screen.dart';
 class AppRoutePath {
   static const String login = '/login';
   static const String register = '/register';
+  static const String verifyEmail = '/verify-email';
   static const String home = '/home';
   static const String dashboard = '/dashboard';
   static const String analysis = '/analysis';
@@ -39,6 +41,7 @@ class AppRouter {
     redirect: (context, state) {
       final User? user = FirebaseAuth.instance.currentUser;
       final bool isLoggedIn = user != null;
+      final bool isVerified = user?.emailVerified ?? false;
 
       final String currentPath = state.matchedLocation;
 
@@ -46,11 +49,21 @@ class AppRouter {
           currentPath == AppRoutePath.login ||
           currentPath == AppRoutePath.register;
 
+      final bool isVerifyPage = currentPath == AppRoutePath.verifyEmail;
+
+      // Belum login → ke /login (kecuali sudah di auth page)
       if (!isLoggedIn && !isAuthPage) {
         return AppRoutePath.login;
       }
 
-      if (isLoggedIn && isAuthPage) {
+      // Sudah login tapi belum verifikasi email → ke /verify-email
+      // Pengecualian: kalau sudah di verify page, biarkan tetap di sana
+      if (isLoggedIn && !isVerified && !isVerifyPage) {
+        return AppRoutePath.verifyEmail;
+      }
+
+      // Sudah login DAN sudah verified → jangan bisa ke auth/verify page
+      if (isLoggedIn && isVerified && (isAuthPage || isVerifyPage)) {
         return AppRoutePath.home;
       }
 
@@ -64,6 +77,10 @@ class AppRouter {
       GoRoute(
         path: AppRoutePath.register,
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: AppRoutePath.verifyEmail,
+        builder: (context, state) => const EmailVerificationScreen(),
       ),
       GoRoute(
         path: AppRoutePath.home,
@@ -97,7 +114,6 @@ class AppRouter {
         path: AppRoutePath.achievements,
         builder: (context, state) => const AchievementsScreen(),
       ),
-      // ── NEW ─────────────────────────────────────────────────
       GoRoute(
         path: AppRoutePath.forum,
         builder: (context, state) => const ForumScreenWrapper(),

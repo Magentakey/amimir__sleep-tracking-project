@@ -30,7 +30,12 @@ class AuthRepository {
     final User? user = userCredential.user;
 
     if (user != null) {
+      // Simpan profil ke Firestore terlebih dulu
       await _saveUserProfile(user: user);
+      // Kirim email verifikasi — Firebase mengirim secara async ke email
+      // user yang baru saja didaftarkan. Link di email akan mengubah
+      // user.emailVerified menjadi true saat diklik.
+      await user.sendEmailVerification();
     }
 
     return userCredential;
