@@ -9,8 +9,10 @@ import '../../features/daily_log/daily_log_providers.dart';
 import '../../features/notifications/app_notifications_provider.dart';
 import '../../features/sleep/sleep_providers.dart';
 import '../../data/local/local_settings_service.dart';
+import '../constants/app_colors.dart';
 import '../services/user_session_service.dart';
 import '../theme/app_theme.dart';
+import 'splash_screen.dart';
 
 /// Widget akar yang memastikan Hive box milik user yang benar sudah
 /// terbuka SEBELUM layar manapun (Home, Dashboard, dst) dirender.
@@ -96,7 +98,10 @@ class _SessionGateState extends ConsumerState<SessionGate> {
         theme: AppTheme.darkTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.dark,
-        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
+        home: const Scaffold(
+          backgroundColor: AppColors.surface,
+          body: SplashScreen(),
+        ),
       );
     }
 
