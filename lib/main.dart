@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -146,7 +147,12 @@ Duration _delayUntilNext(TimeOfDay time) {
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // preserve() wajib dipanggil SEBELUM apapun selain ensureInitialized()
+  // supaya native splash tidak otomatis hilang saat Flutter siap.
+  // Native splash akan tetap tampil di atas semua init di bawah ini,
+  // lalu remove() yang memberitahu Flutter untuk menggantinya dengan app.
+  final WidgetsBinding binding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: binding);
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
@@ -183,6 +189,10 @@ Future<void> main() async {
       constraints: Constraints(networkType: NetworkType.notRequired),
     );
   }
+
+  // Semua init selesai — beritahu Flutter untuk hapus native splash
+  // dan tampilkan app. Dari sini SessionGate mengambil alih.
+  FlutterNativeSplash.remove();
 
   runApp(ProviderScope(child: SessionGate(child: const AmimirApp())));
 }
