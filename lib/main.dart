@@ -7,6 +7,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:workmanager/workmanager.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'app.dart';
 import 'core/services/notification_service.dart';
@@ -156,6 +157,7 @@ Future<void> main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  await initializeDateFormatting('id');
   await Hive.initFlutter();
   await UserSessionService.deleteLegacyUnscopedBoxes();
   await Hive.openBox(LocalSettingsService.settingsBoxName);

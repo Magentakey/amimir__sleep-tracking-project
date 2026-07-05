@@ -107,7 +107,7 @@ class NotificationService {
 
     await _plugin.show(
       _dailyReminderNotificationId,
-      '📝  Waktunya catat harianmu!',
+      'Waktunya catat harianmu!',
       'Jangan lupa isi mood, aktivitas, kafein, dan data makanan hari ini.',
       const NotificationDetails(android: androidDetails),
     );

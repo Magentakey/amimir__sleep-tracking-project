@@ -18,6 +18,11 @@ class ForumPostCard extends ConsumerWidget {
     final hasLiked = post.likes.contains(currentUid);
     final hasDisliked = post.dislikes.contains(currentUid);
     final isAuthor = post.authorUid == currentUid;
+    // Admin bisa hapus post siapapun — UID hardcoded di client untuk
+    // menampilkan tombol. Enforcement sebenarnya ada di Firestore Rules
+    // supaya tidak bisa di-bypass dari luar app.
+    const String adminUid = 'KiIMlYV9jOO84SYD7vIgfX93b3u1';
+    final bool canDelete = isAuthor || currentUid == adminUid;
     final service = ref.read(forumServiceProvider);
 
     return Container(
@@ -80,8 +85,8 @@ class ForumPostCard extends ConsumerWidget {
                 ),
                 // Category chip
                 _CategoryChip(category: post.category),
-                // More menu for author
-                if (isAuthor)
+                // More menu untuk author atau admin
+                if (canDelete)
                   PopupMenuButton<String>(
                     color: AppColors.surfaceContainerHighest,
                     shape: RoundedRectangleBorder(
@@ -174,13 +179,7 @@ class ForumPostCard extends ConsumerWidget {
   }
 
   String _formatDate(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return 'Baru saja';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m lalu';
-    if (diff.inHours < 24) return '${diff.inHours}j lalu';
-    if (diff.inDays < 7) return '${diff.inDays}h lalu';
-    return DateFormat('d MMM yyyy', 'id').format(dt);
+    return DateFormat('d MMMM yyyy, HH:mm', 'id').format(dt);
   }
 }
 
