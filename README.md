@@ -30,15 +30,11 @@ dikembangkan sebagai project kampus semester 4. Aplikasi ini membantu pengguna
 memahami pola tidur mereka, mencatat aktivitas harian, dan mendapatkan
 rekomendasi personal dari AI berdasarkan data yang dikumpulkan.
 
-Nama "amimir" berasal dari kata *amir* (pemimpin) yang dikombinasikan dengan
-konsep tidur malam — sebuah pengingat bahwa tidur yang baik adalah pondasi hari
-yang produktif.
-
 ---
 
 ## About
 
-**Wonderful Dream Production** merupakan kelompok pengembang yang dibentuk untuk mengerjakan proyek pada mata kuliah **Rekayasa Perangkat Lunak (RPL)** di **Institut Teknologi Indonesia (ITI)** tahun **2026**.
+**Wonderful Dream Production** kelompok yang dibentuk pada mata kuliah **Rekayasa Perangkat Lunak (RPL)** di **Institut Teknologi Indonesia (ITI)** tahun **2026**.
 
 ### Team Members
 - Ramdhany Sunarto
@@ -343,6 +339,8 @@ Foto profil tidak diimplementasikan karena Firebase Storage membutuhkan
 upgrade ke Blaze plan. Avatar menggunakan initial huruf pertama nama.
 Alternatif: Cloudinary (free tier 25 GB, tanpa kartu kredit).
 
+
 ---
+
 
 > "Sleep is the best meditation." — Dalai Lama
