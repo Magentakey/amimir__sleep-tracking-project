@@ -36,6 +36,22 @@ yang produktif.
 
 ---
 
+## About
+
+**Wonderful Dream Production** merupakan kelompok pengembang yang dibentuk untuk mengerjakan proyek pada mata kuliah **Rekayasa Perangkat Lunak (RPL)** di **Institut Teknologi Indonesia (ITI)** tahun **2026**.
+
+### Team Members
+- Ramdhany Sunarto
+- Muhammad Andi Rizky Maulana Ibrahim
+- Gilang Putra Wardana
+- Muhammad Arik Hadi Sucahyo
+
+**Institution:** Institut Teknologi Indonesia (ITI)  
+**Year:** 2026  
+**Course:** Rekayasa Perangkat Lunak (RPL)
+
+---
+
 ## Fitur Utama
 
 ### Tidur
@@ -328,15 +344,5 @@ upgrade ke Blaze plan. Avatar menggunakan initial huruf pertama nama.
 Alternatif: Cloudinary (free tier 25 GB, tanpa kartu kredit).
 
 ---
-
-## Lisensi
-
-MIT License — lihat file [LICENSE](LICENSE) untuk detail.
-
----
-
-## Developer
-
-Dibuat sebagai project kampus semester 4.
 
 > "Sleep is the best meditation." — Dalai Lama
