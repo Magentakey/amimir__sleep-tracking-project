@@ -217,8 +217,14 @@ Jalankan app dengan API key via `--dart-define`:
 ```bash
 flutter run --dart-define=GEMINI_API_KEY=ISI_API_KEY_KAMU
 
+// default model ai-nya, ganti jika ingin pake yg lain
+flutter run --dart-define=GEMINI_API_KEY=ISI_API_KEY_KAMU --dart-define=GEMINI_MODEL=gemini-3.5-flash --dart-define=GEMINI_VISION_MODEL=gemini-3.5-flash
+
 # Build release
 flutter build apk --release --dart-define=GEMINI_API_KEY=ISI_API_KEY_KAMU
+
+// default model ai-nya, ganti jika ingin pake yg lain
+flutter build apk --release --dart-define=GEMINI_API_KEY=ISI_API_KEY_KAMU --dart-define=GEMINI_MODEL=gemini-3.5-flash --dart-define=GEMINI_VISION_MODEL=gemini-3.5-flash
 ```
 
 Dapatkan API key gratis di [Google AI Studio](https://aistudio.google.com/).
